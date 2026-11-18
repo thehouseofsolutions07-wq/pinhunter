@@ -1,0 +1,28 @@
+{
+  "name": "pinhunter",
+  "version": "0.1.0",
+  "description": "Hunts best-selling affiliate products, writes Pinterest pin drafts into a Google Sheet, and posts them once you add the image. Bring your own AI (Gemini, Grok, OpenAI, Claude, Ollama...).",
+  "type": "module",
+  "bin": {
+    "pinhunter": "bin/pinhunter.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "demo": "node bin/pinhunter.js demo",
+    "hunt": "node bin/pinhunter.js hunt",
+    "publish-pins": "node bin/pinhunter.js publish"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "pinterest",
+    "affiliate-marketing",
+    "aliexpress",
+    "amazon-associates",
+    "google-sheets",
+    "ai",
+    "automation"
+  ],
+  "license": "MIT"
+}
