@@ -23,6 +23,8 @@ It works with **any AI you already use**: Google Gemini, xAI Grok, OpenAI, Anthr
 
 **The AI never invents products.** It only picks search keywords, ranks the results, and writes copy. Every product and link comes from a real affiliate source.
 
+> **New here?** Follow the step-by-step [Getting started guide](docs/GETTING-STARTED.md). It walks you from installing Node.js to your first posted pin, using the dashboard instead of the command line.
+
 ---
 
 ## Try it in 10 seconds (no accounts needed)
@@ -30,7 +32,7 @@ It works with **any AI you already use**: Google Gemini, xAI Grok, OpenAI, Anthr
 Requires [Node.js 22+](https://nodejs.org). There's nothing to install: PinHunter has zero dependencies.
 
 ```bash
-git clone https://github.com/<you>/pinhunter.git
+git clone https://github.com/thehouseofsolutions07-wq/pinhunter.git
 cd pinhunter
 node bin/pinhunter.js demo
 ```
