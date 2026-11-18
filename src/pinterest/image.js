@@ -23,7 +23,7 @@ function sniff(buf) {
 }
 
 /** Load an image from a URL or a local file path and return it base64-encoded for Pinterest. JPG/PNG only. */
-export async function loadImage(src, fetchImpl = fetch, { cwd = process.cwd() } = {}) {
+export async function loadImage(src, fetchImpl = fetch, { cwd = process.cwd(), allowFiles = true } = {}) {
   const s = String(src || '').trim();
   if (!s) throw new Error('No image: paste an image link into the image_url column.');
   let buf;
@@ -37,6 +37,7 @@ export async function loadImage(src, fetchImpl = fetch, { cwd = process.cwd() } 
     if (!res.ok) throw new Error(`Image link answered HTTP ${res.status}. Is the file shared publicly?`);
     buf = Buffer.from(await res.arrayBuffer());
   } else {
+    if (!allowFiles) throw new Error('Paste an image link (https://…). File paths only work when PinHunter runs on your own computer.');
     const p = resolve(cwd, s);
     if (!existsSync(p)) throw new Error(`Image file not found: ${s}`);
     if (statSync(p).size > MAX_BYTES) throw new Error('Image is larger than 20 MB.');

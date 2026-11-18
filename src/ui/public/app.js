@@ -11,6 +11,9 @@ if (params.has('t') || params.has('connected')) {
 }
 let TOKEN = '';
 try { TOKEN = localStorage.getItem('ph_token') || ''; } catch {}
+// Hosted mode (pinhunter on a web host): logged in with a password cookie instead of the token.
+let HOSTED = false;
+let LOGGED_IN = Boolean(TOKEN);
 
 // ---------- helpers ----------
 const main = document.getElementById('main');
@@ -39,10 +42,14 @@ function el(tag, attrs = {}, ...kids) {
 async function api(path, { method = 'GET', body } = {}) {
   const res = await fetch(path, {
     method,
-    headers: { 'x-pinhunter-token': TOKEN, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+    headers: { ...(TOKEN ? { 'x-pinhunter-token': TOKEN } : {}), 'x-pinhunter-csrf': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && HOSTED && !path.startsWith('/api/login')) {
+    LOGGED_IN = false;
+    showLogin();
+  }
   if (!res.ok) {
     const err = new Error(data.error || `Request failed (${res.status})`);
     err.status = res.status;
@@ -473,7 +480,7 @@ function draftCard(d, boards = [], readOnly = false) {
     if (!url) return;
     put(imgMsg, el('span', { class: 'spin' }), ' checking image…');
     try {
-      const res = await fetch(`/api/image?url=${encodeURIComponent(url)}`, { headers: { 'x-pinhunter-token': TOKEN } });
+      const res = await fetch(`/api/image?url=${encodeURIComponent(url)}`, { headers: TOKEN ? { 'x-pinhunter-token': TOKEN } : {} });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not load the image.');
       const blobUrl = URL.createObjectURL(await res.blob());
       put(thumb, );
@@ -540,9 +547,43 @@ function draftCard(d, boards = [], readOnly = false) {
   );
 }
 
+// ---------- login (hosted mode) ----------
+function showLogin(message = '') {
+  for (const a of document.querySelectorAll('#nav a')) a.classList.remove('on');
+  const pw = el('input', { type: 'password', id: 'pw', autocomplete: 'current-password', required: true, autofocus: true });
+  const msg = el('p', { class: 'muted', role: 'alert' }, message);
+  const btn = el('button', { class: 'primary', type: 'submit' }, 'Log in');
+  const form = el('form', {
+    class: 'panel login',
+    onsubmit: async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      try {
+        await api('/api/login', { method: 'POST', body: { password: pw.value } });
+        LOGGED_IN = true;
+        route();
+      } catch (err) {
+        put(msg, err.message);
+        pw.select();
+      } finally {
+        btn.disabled = false;
+      }
+    },
+  }, el('h1', {}, 'Log in to PinHunter'), el('label', { for: 'pw' }, 'Password'), pw, btn, msg);
+  put(main, form);
+  pw.focus();
+}
+
+async function logout() {
+  await api('/api/logout', { method: 'POST' }).catch(() => {});
+  LOGGED_IN = false;
+  showLogin('You are logged out.');
+}
+
 // ---------- router ----------
 function route() {
-  if (!TOKEN) {
+  if (HOSTED && !LOGGED_IN) return showLogin();
+  if (!LOGGED_IN) {
     put(main, el('div', { class: 'panel' }, el('h1', {}, 'Open PinHunter from your terminal'), el('p', {}, 'Run ', el('code', {}, 'npm run ui'), ' (or ', el('code', {}, 'pinhunter ui'), ') in the PinHunter folder. It opens this page with your private session link.')));
     return;
   }
@@ -556,7 +597,18 @@ function route() {
   window.scrollTo(0, 0);
 }
 window.addEventListener('hashchange', route);
-route();
+fetch('/api/session', { headers: TOKEN ? { 'x-pinhunter-token': TOKEN } : {} })
+  .then((r) => r.json())
+  .catch(() => ({}))
+  .then((s) => {
+    HOSTED = Boolean(s.hosted);
+    LOGGED_IN = Boolean(s.loggedIn);
+    if (HOSTED) {
+      document.querySelector('.side-foot').textContent = 'Online version. Keys stay on your server.';
+      document.getElementById('nav').append(el('a', { href: '#', onclick: (e) => { e.preventDefault(); logout(); } }, el('span', { class: 'ico' }, '⏻'), 'Log out'));
+    }
+    route();
+  });
 const flash = sessionStorage.getItem('ph_flash');
 if (flash) {
   sessionStorage.removeItem('ph_flash');

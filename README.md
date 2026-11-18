@@ -121,6 +121,20 @@ This opens PinHunter in your browser at `http://localhost:8085`. It only listens
 
 Keep the terminal window open while you use it, and press Ctrl+C to stop it. Options: `--port 8090`, `--no-open`, and `--demo`. Run `npm run ui:demo` to try the dashboard with sample data and no accounts. If you change the port, your Pinterest app's redirect URI must be changed to match (`http://localhost:<port>/callback`).
 
+### Put the dashboard online (optional)
+
+You can run the same dashboard on a web host so you can open it from any device. On the host, it asks for a password.
+
+1. Deploy this repo as a Node.js app (Hostinger Business/Cloud, Render, Railway, a VPS…). The start command is `npm start`, which runs `server.js`, and the app listens on `PORT`.
+2. Set these environment variables on the host:
+   - `PINHUNTER_PUBLIC_URL`: the address it lives at, e.g. `https://pins.example.com`
+   - `PINHUNTER_PASSWORD`: at least 10 characters
+   - `PINHUNTER_UI_TOKEN`: a long random string. Changing it logs everyone out.
+   - your keys as in `.env`. Use `GOOGLE_SERVICE_ACCOUNT_JSON` (base64) instead of a key file.
+3. In your Pinterest app, add `https://<your address>/callback` as a redirect URI.
+
+Online, it only answers on that address. Wrong passwords are limited to 5 tries per 15 minutes. The login cookie is HttpOnly, Secure and SameSite=Strict. Image links must be web links, not file paths.
+
 ## Daily use (command line)
 
 ```bash

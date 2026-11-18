@@ -11,7 +11,7 @@ export function resolveBoard(value, boards) {
 const realSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Post every READY row (up to maxPostsPerRun) and write the result back to the Sheet. */
-export async function runPublish({ queue, pinterest, prefs, fetch: fetchImpl = fetch, log = console.log, dryRun = false, sleep = realSleep, cwd }) {
+export async function runPublish({ queue, pinterest, prefs, fetch: fetchImpl = fetch, log = console.log, dryRun = false, sleep = realSleep, cwd, allowFiles = true }) {
   const drafts = await queue.readDrafts();
   const ready = drafts.filter((d) => normStatus(d.status) === 'READY');
   const result = { posted: 0, failed: 0, waiting: ready.length };
@@ -30,7 +30,7 @@ export async function runPublish({ queue, pinterest, prefs, fetch: fetchImpl = f
       if (!/^https?:\/\//i.test(String(d.affiliate_link || '').trim())) throw new Error('affiliate_link is empty or not a web link.');
       const board = resolveBoard(d.board, boards);
       if (!board) throw new Error(`Board "${d.board}" not found. Your boards: ${boards.map((b) => b.name).join(', ') || '(none — create one on Pinterest first)'}`);
-      const image = await loadImage(d.image_url, fetchImpl, { cwd });
+      const image = await loadImage(d.image_url, fetchImpl, { cwd, allowFiles });
       const pin = {
         board_id: board.id,
         title: truncate(d.pin_title, 100),

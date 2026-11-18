@@ -200,3 +200,7 @@ details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var
   .g2, .g3 { grid-template-columns: 1fr; }
   .cards { grid-template-columns: 1fr; }
 }
+
+/* login (hosted mode) */
+.login { max-width: 380px; margin: 60px auto; display: grid; gap: 10px; }
+.login h1 { margin: 0 0 6px; }

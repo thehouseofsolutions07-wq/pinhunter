@@ -67,5 +67,5 @@ export async function doHunt(ctx, { dryRun = false } = {}) {
 
 /** Post READY drafts to Pinterest and write the result back. */
 export function doPublish(ctx, { dryRun = false } = {}) {
-  return runPublish({ queue: ctx.queue(), pinterest: ctx.pinterest(), prefs: ctx.prefs, log: ctx.log, dryRun, cwd: ctx.cwd });
+  return runPublish({ queue: ctx.queue(), pinterest: ctx.pinterest(), prefs: ctx.prefs, log: ctx.log, dryRun, cwd: ctx.cwd, allowFiles: ctx.allowFiles !== false });
 }

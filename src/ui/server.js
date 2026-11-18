@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +44,31 @@ function sameToken(given, token) {
   const a = Buffer.from(String(given || ''));
   const b = Buffer.from(token);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Compare two secrets of any length in constant time. */
+function sameSecret(a, b) {
+  const h = (v) => createHash('sha256').update(String(v ?? '')).digest();
+  return timingSafeEqual(h(a), h(b));
+}
+
+const SESSION_COOKIE = 'ph_session';
+const SESSION_DAYS = 30;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_FAILS = 5;
+
+function readCookie(req, name) {
+  for (const part of String(req.headers.cookie || '').split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === name) return v.join('=');
+  }
+  return '';
+}
+
+/** The visitor's address. Behind Hostinger's proxy the last X-Forwarded-For entry is the one the proxy added. */
+function clientIp(req) {
+  const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((x) => x.trim()).filter(Boolean);
+  return xff.at(-1) || req.socket.remoteAddress || '?';
 }
 
 async function readBody(req) {
@@ -123,16 +148,63 @@ function savePrefs(cwd, input) {
 }
 
 /**
- * The local dashboard. Binds to 127.0.0.1 by the caller; every /api call needs the session token.
- * makeContext({cwd, log}) builds the same context the CLI uses (injectable for tests).
+ * The dashboard server. makeContext({cwd, log}) builds the same context the CLI uses (injectable for tests).
+ * Local mode (default): bound to 127.0.0.1 by the caller; every /api call needs the session token.
+ * Hosted mode (publicUrl set): only that host is served; /api needs the token or a password login cookie.
  */
-export function createUiServer({ cwd = process.cwd(), token, makeContext = defaultMakeContext, fetchImpl = fetch } = {}) {
+export function createUiServer({ cwd = process.cwd(), token, makeContext = defaultMakeContext, fetchImpl = fetch, publicUrl = '', password = '' } = {}) {
   if (!token) throw new Error('createUiServer needs a token.');
+  const hosted = Boolean(publicUrl);
+  if (hosted && String(password).length < 10) throw new Error('Hosted mode needs PINHUNTER_PASSWORD (at least 10 characters).');
+  const publicOrigin = hosted ? new URL(publicUrl).origin : '';
+  const publicHost = hosted ? new URL(publicUrl).host.toLowerCase() : '';
   const jobs = new Map();
   let running = null;
   const oauthStates = new Map();
+  const loginFails = new Map();
 
-  const ctxFor = (log = () => {}) => makeContext({ cwd, log });
+  const ctxFor = (log = () => {}) => {
+    const ctx = makeContext({ cwd, log });
+    if (hosted) ctx.allowFiles = false;
+    return ctx;
+  };
+
+  const sign = (exp) => createHmac('sha256', token).update(`session:${exp}`).digest('hex');
+  function hasSession(req) {
+    if (!hosted) return false;
+    const [exp, sig] = readCookie(req, SESSION_COOKIE).split('.');
+    if (!exp || !sig || !/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
+    return sameToken(sig, sign(exp));
+  }
+  const cookie = (value, maxAge) => `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`;
+
+  /** Who may call /api: the token header, or (hosted) a login cookie plus the CSRF header on changes. */
+  function authorize(req) {
+    if (sameToken(req.headers['x-pinhunter-token'], token)) return;
+    if (hasSession(req)) {
+      if (req.method !== 'GET' && req.headers['x-pinhunter-csrf'] !== '1') throw new HttpErr(403, 'Missing request header. Reload the page and try again.');
+      return;
+    }
+    throw new HttpErr(401, hosted ? 'Please log in.' : 'Missing or wrong session token. Open PinHunter from the link "pinhunter ui" prints.');
+  }
+
+  /** Check the password (5 wrong tries per address per 15 minutes) and return the session cookie. */
+  async function login(req) {
+    if (!hosted) throw new HttpErr(404, 'Not found.');
+    const ip = clientIp(req);
+    const now = Date.now();
+    for (const [k, v] of loginFails) if (now - v.first > LOGIN_WINDOW_MS) loginFails.delete(k);
+    const fails = loginFails.get(ip);
+    if (fails && fails.count >= LOGIN_MAX_FAILS) throw new HttpErr(429, 'Too many wrong passwords. Try again in 15 minutes.');
+    const body = await readBody(req);
+    if (!sameSecret(body.password, password)) {
+      loginFails.set(ip, { first: fails?.first || now, count: (fails?.count || 0) + 1 });
+      throw new HttpErr(401, 'Wrong password.');
+    }
+    loginFails.delete(ip);
+    const exp = String(now + SESSION_DAYS * 24 * 3600 * 1000);
+    return cookie(`${exp}.${sign(exp)}`, SESSION_DAYS * 24 * 3600);
+  }
 
   function startJob(type, dryRun) {
     if (running) throw new HttpErr(409, `A ${running.type} is already running. Wait for it to finish.`);
@@ -239,7 +311,7 @@ export function createUiServer({ cwd = process.cwd(), token, makeContext = defau
     if (path === '/api/pinterest/connect' && method === 'GET') {
       const env = readEnv(cwd);
       if (!env.PINTEREST_CLIENT_ID || !env.PINTEREST_CLIENT_SECRET) throw new HttpErr(400, 'Save your Pinterest App ID and App secret first.');
-      const redirectUri = env.PINTEREST_REDIRECT_URI || `http://localhost:${server.address().port}/callback`;
+      const redirectUri = env.PINTEREST_REDIRECT_URI || (hosted ? `${publicOrigin}/callback` : `http://localhost:${server.address().port}/callback`);
       const state = randomBytes(16).toString('hex');
       oauthStates.set(state, { redirectUri, at: Date.now() });
       const authUrl =
@@ -278,19 +350,29 @@ export function createUiServer({ cwd = process.cwd(), token, makeContext = defau
   const server = createServer(async (req, res) => {
     const port = server.address()?.port;
     const host = String(req.headers.host || '').toLowerCase();
-    if (host !== `localhost:${port}` && host !== `127.0.0.1:${port}`) {
+    if (hosted ? host !== publicHost : host !== `localhost:${port}` && host !== `127.0.0.1:${port}`) {
       res.writeHead(403, { 'content-type': 'text/plain' }).end('Forbidden host.');
       return;
     }
     const url = new URL(req.url, `http://${host}`);
-    const sec = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store' };
+    const sec = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', ...(hosted ? { 'strict-transport-security': 'max-age=31536000' } : {}) };
+    const json = (status, body, extra = {}) => {
+      res.writeHead(status, { ...sec, 'content-type': 'application/json; charset=utf-8', ...extra });
+      res.end(JSON.stringify(body));
+    };
     try {
       if (url.pathname === '/callback') return await callback(url, res);
 
+      if (url.pathname === '/api/session' && req.method === 'GET') {
+        return json(200, { hosted, loggedIn: sameToken(req.headers['x-pinhunter-token'], token) || hasSession(req) });
+      }
+      if (url.pathname === '/api/login' && req.method === 'POST') return json(200, { ok: true }, { 'set-cookie': await login(req) });
+      if (url.pathname === '/api/logout' && req.method === 'POST') return json(200, { ok: true }, { 'set-cookie': cookie('', 0) });
+
       if (url.pathname.startsWith('/api/')) {
-        if (!sameToken(req.headers['x-pinhunter-token'], token)) throw new HttpErr(401, 'Missing or wrong session token. Open PinHunter from the link "pinhunter ui" prints.');
+        authorize(req);
         if (url.pathname === '/api/image' && req.method === 'GET') {
-          const img = await loadImage(url.searchParams.get('url'), fetchImpl, { cwd }).catch((e) => {
+          const img = await loadImage(url.searchParams.get('url'), fetchImpl, { cwd, allowFiles: !hosted }).catch((e) => {
             throw new HttpErr(422, e.message);
           });
           res.writeHead(200, { ...sec, 'content-type': img.contentType });
@@ -299,9 +381,7 @@ export function createUiServer({ cwd = process.cwd(), token, makeContext = defau
         }
         const out = await api(req, url, server);
         const [status, body] = Array.isArray(out) ? out : [200, out];
-        res.writeHead(status, { ...sec, 'content-type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(body));
-        return;
+        return json(status, body);
       }
 
       const file = req.method === 'GET' && STATIC[url.pathname];

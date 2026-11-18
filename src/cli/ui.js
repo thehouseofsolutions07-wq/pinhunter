@@ -40,6 +40,24 @@ export function demoMakeContext() {
   });
 }
 
+/**
+ * Run the dashboard on a web host (Hostinger, Render, a VPS…). Needs PINHUNTER_PUBLIC_URL, PINHUNTER_PASSWORD
+ * and PINHUNTER_UI_TOKEN in the environment or .env; listens on PORT.
+ */
+export async function runHosted({ cwd = process.cwd(), log = console.log } = {}) {
+  const env = readEnv(cwd);
+  const missing = ['PINHUNTER_PUBLIC_URL', 'PINHUNTER_PASSWORD', 'PINHUNTER_UI_TOKEN'].filter((k) => !env[k]);
+  if (missing.length) throw new Error(`Set ${missing.join(', ')} in the host's environment variables.`);
+  const server = createUiServer({ cwd, token: env.PINHUNTER_UI_TOKEN, publicUrl: env.PINHUNTER_PUBLIC_URL, password: env.PINHUNTER_PASSWORD });
+  const p = Number(env.PORT || 3000);
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(p, resolve);
+  });
+  log(`PinHunter dashboard is running on port ${p} for ${env.PINHUNTER_PUBLIC_URL}`);
+  return server;
+}
+
 /** Start the local dashboard on 127.0.0.1 and open it in the browser. */
 export async function runUi({ cwd = process.cwd(), log = console.log } = {}, { port, open = true, demo = false } = {}) {
   let token;

@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "description": "Hunts best-selling affiliate products, writes Pinterest pin drafts into a Google Sheet, and posts them once you add the image. Bring your own AI (Gemini, Grok, OpenAI, Claude, Ollama...).",
   "type": "module",
+  "main": "server.js",
   "bin": {
     "pinhunter": "bin/pinhunter.js"
   },
   "scripts": {
+    "start": "node server.js",
     "ui": "node bin/pinhunter.js ui",
     "ui:demo": "node bin/pinhunter.js ui --demo",
     "test": "node --test",
