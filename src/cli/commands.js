@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { runChecks, doHunt, doPublish } from '../actions.js';
 import { runAuth } from './auth.js';
 import { runDemo } from './demo.js';
+import { runUi } from './ui.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -11,6 +12,7 @@ export const HELP = `PinHunter — affiliate product hunter and Pinterest pin dr
 
 Usage: pinhunter <command> [--dry-run]
 
+  ui         open the dashboard in your browser (keys, drafts, hunt, publish)
   init       create .env and pinhunter.config.json from the examples
   auth       connect your Pinterest account (one-time browser login)
   boards     list your Pinterest boards
@@ -21,6 +23,9 @@ Usage: pinhunter <command> [--dry-run]
   help       show this help
 
   --dry-run  (hunt, publish) show what would happen without writing or posting
+  --port N   (ui) use another port (default 8085)
+  --no-open  (ui) do not open the browser
+  --demo     (ui) try the dashboard with sample data, no accounts needed
 `;
 
 export const commands = {
@@ -65,4 +70,9 @@ export const commands = {
   },
 
   demo: () => runDemo(),
+
+  ui: async (ctx, { port, open, demo }) => {
+    await runUi(ctx, { port, open, demo });
+    await new Promise(() => {}); // keep running until Ctrl+C
+  },
 };

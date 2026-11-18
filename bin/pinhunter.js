@@ -9,8 +9,9 @@ if (major < 22) {
 }
 
 const args = process.argv.slice(2);
-const name = (args.find((a) => !a.startsWith('-')) || 'help').toLowerCase();
-const flags = { dryRun: args.includes('--dry-run') };
+const name = (args.find((a, i) => !a.startsWith('-') && args[i - 1] !== '--port') || 'help').toLowerCase();
+const portAt = args.indexOf('--port');
+const flags = { dryRun: args.includes('--dry-run'), open: !args.includes('--no-open'), demo: args.includes('--demo'), port: portAt >= 0 ? Number(args[portAt + 1]) || undefined : undefined };
 if (args.includes('--help') || args.includes('-h')) {
   console.log(HELP);
   process.exit(0);
@@ -23,7 +24,7 @@ if (!command) {
 }
 
 try {
-  const ctx = name === 'demo' || name === 'help' ? { log: console.log, cwd: process.cwd() } : buildContext();
+  const ctx = name === 'demo' || name === 'help' || name === 'ui' ? { log: console.log, cwd: process.cwd() } : buildContext();
   await command(ctx, flags);
 } catch (e) {
   console.error(e instanceof SetupError ? `Setup needed: ${e.message}` : `Error: ${e.message}`);

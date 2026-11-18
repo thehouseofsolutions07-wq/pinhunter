@@ -5,3 +5,5 @@ service-account*.json
 .superpowers/
 coverage/
 .DS_Store
+.claude/
+pinhunter.config.json

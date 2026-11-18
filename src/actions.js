@@ -26,7 +26,7 @@ export async function runChecks(ctx) {
     const q = ctx.queue();
     await q.ensure();
     const drafts = await q.readDrafts();
-    return `${drafts.length} drafts · ${q.url}`;
+    return `${drafts.length} drafts${q.url ? ` · ${q.url}` : ''}`;
   });
   await check('Pinterest', async () => {
     const boards = await ctx.pinterest().listBoards();

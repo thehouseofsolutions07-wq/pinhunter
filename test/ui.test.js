@@ -213,3 +213,19 @@ test('connect returns a Pinterest login link with the dashboard callback', async
   assert.ok(u.searchParams.get('state'));
   assert.ok(existsSync(join(process.cwd(), 'src/ui/public/index.html')));
 });
+
+test('demo mode hunts and publishes with sample data, no accounts', async () => {
+  const { demoMakeContext } = await import('../src/cli/ui.js');
+  const cwd = mkdtempSync(join(tmpdir(), 'ph-demo-'));
+  const server = createUiServer({ cwd, token: TOKEN, makeContext: demoMakeContext() });
+  servers.push(server);
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  const call = (path, init = {}) =>
+    fetch(`http://127.0.0.1:${port}${path}`, { ...init, headers: { 'x-pinhunter-token': TOKEN, 'content-type': 'application/json' } }).then((r) => r.json());
+  const { id } = await call('/api/jobs', { method: 'POST', body: JSON.stringify({ type: 'hunt' }) });
+  const job = await waitJob((p) => call(p).then((json) => ({ json })), id);
+  assert.equal(job.status, 'done', job.error);
+  assert.equal((await call('/api/drafts')).drafts.length, 5);
+  assert.equal((await call('/api/boards')).boards.length, 3);
+});

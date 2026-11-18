@@ -7,6 +7,8 @@
     "pinhunter": "bin/pinhunter.js"
   },
   "scripts": {
+    "ui": "node bin/pinhunter.js ui",
+    "ui:demo": "node bin/pinhunter.js ui --demo",
     "test": "node --test",
     "demo": "node bin/pinhunter.js demo",
     "hunt": "node bin/pinhunter.js hunt",

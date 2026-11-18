@@ -6,7 +6,7 @@ import { createPinterest, PINTEREST_SCOPES } from '../pinterest/client.js';
 import { updateEnvFile } from './envfile.js';
 import { SetupError } from './context.js';
 
-function openBrowser(url) {
+export function openBrowser(url) {
   try {
     const [cmd, args] =
       process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];

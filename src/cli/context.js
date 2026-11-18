@@ -31,7 +31,7 @@ export function buildContext({ cwd = process.cwd(), log = console.log, env: give
       return Boolean(env.PINTEREST_ACCESS_TOKEN || (env.PINTEREST_REFRESH_TOKEN && env.PINTEREST_CLIENT_ID && env.PINTEREST_CLIENT_SECRET));
     },
     pinterest() {
-      if (!this.hasPinterest()) throw new SetupError('Pinterest is not connected. Set PINTEREST_CLIENT_ID and PINTEREST_CLIENT_SECRET in .env, then run "pinhunter auth".');
+      if (!this.hasPinterest()) throw new SetupError('Pinterest is not connected. Add your Pinterest app keys (Keys & connections in the dashboard, or PINTEREST_CLIENT_ID and PINTEREST_CLIENT_SECRET in .env), then click "Connect Pinterest" or run "pinhunter auth".');
       return createPinterest({
         accessToken: env.PINTEREST_ACCESS_TOKEN,
         refreshToken: env.PINTEREST_REFRESH_TOKEN,

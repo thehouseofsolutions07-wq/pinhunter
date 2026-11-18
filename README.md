@@ -105,7 +105,23 @@ node bin/pinhunter.js doctor
 
 ---
 
-## Daily use
+## Use the dashboard (easiest)
+
+```bash
+npm run ui          # or: node bin/pinhunter.js ui
+```
+
+This opens PinHunter in your browser at `http://localhost:8085`. It only listens on your own computer, and the link includes a private session key that is saved in `.env`. In the dashboard you can:
+
+- **Keys & connections:** paste your AI key, Google Sheet, Pinterest app and affiliate keys. Secrets are never shown again; only their last 4 characters are. Click **Connect Pinterest** to log in once.
+- **Hunt:** find products and write drafts, with a live log. Tick "dry run" to preview without saving.
+- **Drafts:** paste each image link, preview it, adjust the board or copy, and mark it **Ready**.
+- **Publish:** post every Ready draft and see the pin links.
+- **Settings:** niches, sources, price range, how many drafts per run, and which board each niche goes to.
+
+Keep the terminal window open while you use it, and press Ctrl+C to stop it. Options: `--port 8090`, `--no-open`, and `--demo`. Run `npm run ui:demo` to try the dashboard with sample data and no accounts. If you change the port, your Pinterest app's redirect URI must be changed to match (`http://localhost:<port>/callback`).
+
+## Daily use (command line)
 
 ```bash
 node bin/pinhunter.js hunt --dry-run   # preview, writes nothing
