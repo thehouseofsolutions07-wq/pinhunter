@@ -45,23 +45,49 @@ export function extractJSON(text) {
  * Create an AI client.
  * @returns {{ provider: string, chatJSON(system: string, user: string): Promise<any> }}
  */
-export function createAI({ provider, apiKey, model, baseUrl, temperature = 0.7 } = {}, fetchImpl = fetch) {
+const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** True for errors worth retrying: rate limits, overloaded servers, timeouts and network failures. */
+export function isRetryable(err) {
+  if (err?.status) return RETRY_STATUS.has(err.status);
+  return err?.name === 'TimeoutError' || err?.name === 'AbortError' || err instanceof TypeError;
+}
+
+export function createAI(
+  { provider, apiKey, model, baseUrl, temperature = 0.7, retries = 4, timeoutMs = 90_000, sleep = defaultSleep } = {},
+  fetchImpl = fetch,
+) {
   const name = String(provider || '').toLowerCase();
   const preset = PROVIDERS[name];
   if (!preset) {
     throw new Error(`Unknown AI_PROVIDER "${provider}". Use one of: ${Object.keys(PROVIDERS).join(', ')}`);
   }
   if (preset.style !== 'mock') {
-    if (!model) throw new Error('AI_MODEL is not set (for example gemini-2.5-flash, grok-4, gpt-4o-mini, claude-sonnet-5-5).');
+    if (!model) throw new Error('AI_MODEL is not set (for example gemini-3.5-flash-lite, grok-4, gpt-4o-mini, claude-sonnet-5-5).');
     if (!apiKey && !preset.noKey) throw new Error(`AI_API_KEY is not set for provider "${name}".`);
   }
   const base = String(baseUrl || preset.baseUrl).replace(/\/+$/, '');
   if (preset.style !== 'mock' && !base) throw new Error('AI_BASE_URL is required for the "custom" provider.');
 
+  const post = (url, init) => fetchJSON(fetchImpl, url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+
+  /** Call the model, retrying busy/rate-limited/network failures with exponential backoff (2s, 4s, 8s… max 30s). */
   async function complete(system, user) {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await completeOnce(system, user);
+      } catch (e) {
+        if (attempt >= retries || !isRetryable(e)) throw e;
+        await sleep(Math.min(30_000, 2000 * 2 ** attempt));
+      }
+    }
+  }
+
+  async function completeOnce(system, user) {
     if (preset.style === 'mock') return mockReply(system, user);
     if (preset.style === 'anthropic') {
-      const data = await fetchJSON(fetchImpl, `${base}/messages`, {
+      const data = await post(`${base}/messages`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -74,7 +100,7 @@ export function createAI({ provider, apiKey, model, baseUrl, temperature = 0.7 }
     }
     const headers = { 'content-type': 'application/json' };
     if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-    const data = await fetchJSON(fetchImpl, `${base}/chat/completions`, {
+    const data = await post(`${base}/chat/completions`, {
       method: 'POST',
       headers,
       body: JSON.stringify({

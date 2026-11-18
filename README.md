@@ -51,7 +51,7 @@ Then fill in `.env` step by step.
 
 | Provider | `AI_PROVIDER` | Get a key | Example `AI_MODEL` |
 |---|---|---|---|
-| Google Gemini | `gemini` | aistudio.google.com → Get API key | `gemini-2.5-flash` |
+| Google Gemini | `gemini` | aistudio.google.com → Get API key | `gemini-3.5-flash-lite` |
 | xAI Grok | `grok` | console.x.ai | `grok-4` |
 | OpenAI | `openai` | platform.openai.com | `gpt-4o-mini` |
 | Anthropic Claude | `anthropic` | console.anthropic.com | `claude-sonnet-5-5` |
@@ -202,6 +202,7 @@ Create `src/sources/<name>.js` exporting a function that returns `{ name, hunt(k
 | `Pinterest token expired` | Run `pinhunter auth` again (and update the GitHub secret) |
 | `Source "aliexpress" skipped` | Add the AliExpress keys to `.env` |
 | `HTTP 403` from Google | Share the Sheet with the service account email as Editor |
+| `HTTP 503` / `high demand` from the AI | PinHunter already retries busy and rate-limited replies with backoff. If it keeps failing, switch `AI_MODEL` to a lighter model (for Gemini, `gemini-3.5-flash-lite`) |
 
 ## Development
 

@@ -64,3 +64,49 @@ test('custom base URL overrides the preset (e.g. a local Ollama)', async () => {
 test('unknown provider gives a helpful error', () => {
   assert.throws(() => createAI({ provider: 'nope', model: 'm' }), /Unknown AI_PROVIDER "nope"/);
 });
+
+function statusFetch(statuses, okText = '{"ok":true}') {
+  const calls = [];
+  const fn = async (url, init) => {
+    calls.push({ url, init });
+    const s = statuses[Math.min(calls.length - 1, statuses.length - 1)];
+    if (s === 'net') throw new TypeError('fetch failed');
+    const body = s === 200 ? openaiReply(okText) : { error: { code: s, message: 'busy' } };
+    return new Response(JSON.stringify(body), { status: s, headers: { 'content-type': 'application/json' } });
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+test('chatJSON retries 503/429 and network errors with growing waits, then succeeds', async () => {
+  const waits = [];
+  const f = statusFetch([503, 429, 'net', 200]);
+  const ai = createAI({ provider: 'gemini', apiKey: 'k', model: 'm', sleep: async (ms) => waits.push(ms) }, f);
+  assert.deepEqual(await ai.chatJSON('sys', 'user'), { ok: true });
+  assert.equal(f.calls.length, 4);
+  assert.equal(waits.length, 3);
+  assert.ok(waits[0] > 0 && waits[1] > waits[0] && waits[2] > waits[1]);
+});
+
+test('chatJSON does not retry a 400/401 error', async () => {
+  const waits = [];
+  const f = statusFetch([401]);
+  const ai = createAI({ provider: 'gemini', apiKey: 'k', model: 'm', sleep: async (ms) => waits.push(ms) }, f);
+  await assert.rejects(ai.chatJSON('sys', 'user'), /HTTP 401/);
+  assert.equal(f.calls.length, 1);
+  assert.equal(waits.length, 0);
+});
+
+test('chatJSON gives up after the retry limit and reports the last error', async () => {
+  const f = statusFetch([503]);
+  const ai = createAI({ provider: 'gemini', apiKey: 'k', model: 'm', retries: 2, sleep: async () => {} }, f);
+  await assert.rejects(ai.chatJSON('sys', 'user'), /HTTP 503/);
+  assert.equal(f.calls.length, 3);
+});
+
+test('each AI request carries a timeout signal', async () => {
+  const f = statusFetch([200]);
+  const ai = createAI({ provider: 'gemini', apiKey: 'k', model: 'm', timeoutMs: 5000 }, f);
+  await ai.chatJSON('sys', 'user');
+  assert.ok(f.calls[0].init.signal instanceof AbortSignal);
+});
