@@ -1,0 +1,18 @@
+{
+  "niches": ["home decor", "kitchen gadgets", "self care gifts"],
+  "keywords": [],
+  "keywordsPerRun": 3,
+  "sources": ["aliexpress", "feed"],
+  "draftsPerRun": 5,
+  "maxPostsPerRun": 5,
+  "postDelaySeconds": 30,
+  "market": { "country": "US", "currency": "USD", "language": "EN" },
+  "priceRange": { "min": 5, "max": 150 },
+  "boards": {
+    "home decor": "Home Decor Ideas",
+    "kitchen": "Kitchen Finds"
+  },
+  "disclosure": "#affiliate — I may earn a commission if you buy through this link.",
+  "tone": "friendly, helpful and inspiring",
+  "language": "English"
+}

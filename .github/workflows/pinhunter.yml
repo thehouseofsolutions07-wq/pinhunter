@@ -1,0 +1,65 @@
+# Runs PinHunter on GitHub's free runners.
+# 1. Add your keys as repository secrets (Settings → Secrets and variables → Actions → Secrets).
+# 2. Commit your pinhunter.config.json (it holds no secrets).
+# 3. Create a repository *variable* PINHUNTER_ENABLED = true to switch the schedule on.
+name: PinHunter
+
+on:
+  schedule:
+    - cron: '0 13 * * *' # hunt: once a day at 13:00 UTC
+    - cron: '20 * * * *' # publish: every hour
+  workflow_dispatch:
+    inputs:
+      command:
+        description: What to run
+        type: choice
+        options: [hunt, publish, doctor]
+        default: hunt
+
+concurrency:
+  group: pinhunter
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: vars.PINHUNTER_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pick command
+        id: cmd
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT: ${{ inputs.command }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then echo "name=$INPUT" >> "$GITHUB_OUTPUT"
+          elif [ "$SCHEDULE" = "0 13 * * *" ]; then echo "name=hunt" >> "$GITHUB_OUTPUT"
+          else echo "name=publish" >> "$GITHUB_OUTPUT"; fi
+      - name: Run PinHunter
+        run: node bin/pinhunter.js "${{ steps.cmd.outputs.name }}"
+        env:
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          PINTEREST_CLIENT_ID: ${{ secrets.PINTEREST_CLIENT_ID }}
+          PINTEREST_CLIENT_SECRET: ${{ secrets.PINTEREST_CLIENT_SECRET }}
+          PINTEREST_REFRESH_TOKEN: ${{ secrets.PINTEREST_REFRESH_TOKEN }}
+          PINTEREST_ACCESS_TOKEN: ${{ secrets.PINTEREST_ACCESS_TOKEN }}
+          PINTEREST_SANDBOX: ${{ secrets.PINTEREST_SANDBOX }}
+          ALIEXPRESS_APP_KEY: ${{ secrets.ALIEXPRESS_APP_KEY }}
+          ALIEXPRESS_APP_SECRET: ${{ secrets.ALIEXPRESS_APP_SECRET }}
+          ALIEXPRESS_TRACKING_ID: ${{ secrets.ALIEXPRESS_TRACKING_ID }}
+          AMAZON_CREDENTIAL_ID: ${{ secrets.AMAZON_CREDENTIAL_ID }}
+          AMAZON_CREDENTIAL_SECRET: ${{ secrets.AMAZON_CREDENTIAL_SECRET }}
+          AMAZON_CREDENTIAL_VERSION: ${{ secrets.AMAZON_CREDENTIAL_VERSION }}
+          AMAZON_PARTNER_TAG: ${{ secrets.AMAZON_PARTNER_TAG }}
+          AMAZON_MARKETPLACE: ${{ secrets.AMAZON_MARKETPLACE }}
+          NOTIFY_WEBHOOK_URL: ${{ secrets.NOTIFY_WEBHOOK_URL }}
