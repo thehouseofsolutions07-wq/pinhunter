@@ -602,7 +602,7 @@ fetch('/api/session', { headers: TOKEN ? { 'x-pinhunter-token': TOKEN } : {} })
   .catch(() => ({}))
   .then((s) => {
     HOSTED = Boolean(s.hosted);
-    LOGGED_IN = Boolean(s.loggedIn);
+    LOGGED_IN = typeof s.loggedIn === 'boolean' ? s.loggedIn : Boolean(TOKEN);
     if (HOSTED) {
       document.querySelector('.side-foot').textContent = 'Online version. Keys stay on your server.';
       document.getElementById('nav').append(el('a', { href: '#', onclick: (e) => { e.preventDefault(); logout(); } }, el('span', { class: 'ico' }, '⏻'), 'Log out'));
