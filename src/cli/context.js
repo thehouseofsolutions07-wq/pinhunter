@@ -9,8 +9,8 @@ export class SetupError extends Error {}
 
 const truthy = (v) => /^(1|true|yes|on)$/i.test(String(v || ''));
 
-export function buildContext({ cwd = process.cwd(), log = console.log } = {}) {
-  const { env, prefs, configFile } = loadConfig({ cwd });
+export function buildContext({ cwd = process.cwd(), log = console.log, env: givenEnv } = {}) {
+  const { env, prefs, configFile } = loadConfig({ cwd, ...(givenEnv ? { env: givenEnv } : {}) });
   return {
     cwd,
     env,
