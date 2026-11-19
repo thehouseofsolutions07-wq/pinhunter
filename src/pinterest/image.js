@@ -30,7 +30,8 @@ export async function loadImage(src, fetchImpl = fetch, { cwd = process.cwd(), a
   if (/^https?:\/\//i.test(s)) {
     let res;
     try {
-      res = await fetchImpl(directImageUrl(s), { redirect: 'follow' });
+      // Ask for JPG/PNG only: CDNs (AliExpress, Shopify…) turn "*/*" into WebP, which Pinterest rejects.
+      res = await fetchImpl(directImageUrl(s), { redirect: 'follow', headers: { accept: 'image/jpeg,image/png' } });
     } catch (e) {
       throw new Error(`Could not download the image (${e.message}).`);
     }

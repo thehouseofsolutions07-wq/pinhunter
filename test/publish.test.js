@@ -32,6 +32,19 @@ test('loadImage sniffs PNG bytes even when the server says octet-stream', async 
   assert.equal(img.base64, PNG.toString('base64'));
 });
 
+test('loadImage asks for JPG/PNG only, so image CDNs do not send WebP', async () => {
+  // AliExpress and other CDNs answer "Accept: */*" with WebP, which Pinterest rejects.
+  let sent;
+  const negotiating = async (url, init = {}) => {
+    sent = new Headers(init.headers).get('accept') || '*/*';
+    const webp = Buffer.from('RIFF\0\0\0\0WEBPVP8X');
+    return /\*\/\*|webp/.test(sent) ? new Response(webp, { headers: { 'content-type': 'image/webp' } }) : new Response(PNG, { headers: { 'content-type': 'image/png' } });
+  };
+  const img = await loadImage('https://cdn.example/photo.jpg', negotiating);
+  assert.equal(img.contentType, 'image/png');
+  assert.doesNotMatch(sent, /\*\/\*|webp/);
+});
+
 test('loadImage explains when a link is a web page instead of an image', async () => {
   await assert.rejects(loadImage('https://drive.google.com/file/d/bad/view', imageFetch), /not an image.*Anyone with the link/s);
 });
